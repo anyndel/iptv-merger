@@ -115,7 +115,7 @@ if ( isset($_POST['stage']))
                     else
                         $remote->finalPrefix = $lists[$remote->index]->prefix;
                 }                
-
+                                
                 file_put_contents('./data'.$remote->index.'.json',json_encode($remote));
             }
 
@@ -173,34 +173,52 @@ if ( isset($_POST['stage']))
                     if ( file_exists('./data'.$idx.'.json')){
                         $data = json_decode(file_get_contents('./data'.$idx.'.json'));
 
+                        //make a new local
+                        file_put_contents(getLocalPath($idx),$data->remote);
+
                         if ($data->finalPrefix != ''){
+                            /*
                             $len = strlen($data->remote);
-                            
+                            $dr = 0;
                             $newOutput = '';
                             $next = 0;
-                            for ($i = 0; $i < $len; $i+=$next){
-                                
-                                $next = strpos($data->remote,"\n");
+                            $offset = 0;
+                            $fwd = 0;
+                            for ($i = 0; $i < $len; $i+=$fwd){                                
+
+                                $next = strpos($data->remote,"\n",$offset);
                                 $chunk = '';
                                 if ($next === FALSE ){
-                                    $chunk = $data->remote;
-                                    $next = $len;
+                                    $chunk = substr($data->remote,$offset);
+                                    $next = $offset;
                                 }
                                 else{
-                                    $chunk = substr($data->remote,0,$next + 2);                                    
+                                    $chunk = substr($data->remote,$offset,$next + 2);                                    
                                 }
 
-                                str_replace('group-title="','group-title="'.$data->finalPrefix.' ', $chunk);
+                                $tgt = strpos($chunk,'group-title="');
+                                if ( $tgt !== FALSE )
+                                    $chunk = substr($chunk,0,$tgt).'group-title="'.$data->finalPrefix.' '.substr($chunk, $tgt+13);
+                                //str_replace('group-title="','group-title="'.$data->finalPrefix.' ', $chunk);
 
                                 $newOutput.=$chunk;
-
-                                $data->remote = substr($data->remote, $next + 1 );
+                                $fwd = $next - $offset;
+                                
+                                $fwd = $fwd == 0 ? 1 : $fwd;
+                                $offset = $next + 2;
                             }
 
                             $data->remote = $newOutput;
+                            */
+
+                            $rep = 'group-title="'.$data->finalPrefix.' ';
+
+                            $data->remote = preg_replace('/group\-title=\"/',$rep,$data->remote);
                         }
 
-                        fwrite($output,$data->remote);
+                        $break = $idx == 0 ? "" : "\n";
+
+                        fwrite($output,$break.$data->remote);
                     }
                     else
                         continue;
