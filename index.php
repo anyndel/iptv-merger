@@ -29,8 +29,12 @@ function getLocalPath($idx){
     return './local/list'.$idx.'.m3u';
 }
 
+$apikey="aggiornamiLeListe!";
+
+session_start();
+
 $lists = [
-    0 => new IPTVSource('IPTV The Best','http://srv19648.noip.network:8080/get.php?username=xaosssfz&password=zKjhflgjKLK&type=m3u_plus&output=mpegts',''),
+    0 => new IPTVSource('IPTV The Best','http://srv19648.noip.network:80/get.php?username=xaosssfz&password=zKjhflgjKLK&type=m3u_plus&output=mpegts',''),
     1 => new IPTVSource('Wirplex','http://cdn-w.cc/get.php?username=3SC8541&password=98326615&output=ts&type=m3u_plus','[w]')
 ];
 
@@ -41,6 +45,11 @@ if ( isset($_POST['stage']))
     $stage = $_POST['stage'];
 }
 
+if ( isset($_POST['pw']))
+{
+    $_SESSION["APIKEY"] = $_POST['pw'];
+}
+
 ?>
 <html>
     <head>
@@ -49,6 +58,15 @@ if ( isset($_POST['stage']))
         </title>
     </head>
     <body>
+        <?php if (!isset($_SESSION["APIKEY"]) || $_SESSION["APIKEY"] != $apikey){ ?>
+            <form action="./index.php" method="post">
+                <input type="password" name="pw" />
+                <input type="submit" name="auth" value="andiamo"/>
+            </form>            
+        <?php 
+        return;
+        } 
+        ?>
 
         <?php if ($stage == 0){ ?>
 
@@ -98,6 +116,12 @@ if ( isset($_POST['stage']))
                 ob_start();
                 curl_exec($ch);
                 $listData[$idx]->remote = ob_get_clean();
+                if (curl_errno($ch)){
+                    $err = [];
+                    $err['error'] = curl_error($ch);
+                    $err["code"] = curl_errno($ch);
+                	var_dump($err);
+                }                
                 curl_close($ch);                
             }   
             
@@ -107,7 +131,7 @@ if ( isset($_POST['stage']))
                 if ( $len > 0 ){
 
                     if ( file_exists(getLocalPath($remote->index)) ){
-                        $remote->$changed = filesize(getLocalPath($remote->index)) != $len;
+                        $remote->changed = filesize(getLocalPath($remote->index)) != $len;
                     }  
                     
                     if ( isset($_POST['prefix-for-'.$remote->index]) )
@@ -166,7 +190,16 @@ if ( isset($_POST['stage']))
 
             <?php
 
+                $keys = [];
 
+                foreach (scandir('./keys') as $key){
+
+                    if (strlen($key) < 6) continue;
+
+                    $keyName = substr($key, 0, strlen($key) - 3);
+
+                    $keys[$keyName] = file_get_contents('./keys/'.$key);
+                }
 
                 $output = fopen("./list/list.m3u","w");
                 foreach ($lists as $idx=>$source){
@@ -215,6 +248,9 @@ if ( isset($_POST['stage']))
 
                             $data->remote = preg_replace('/group\-title=\"/',$rep,$data->remote);
                         }
+
+                        foreach($keys as $keyname=>$keyval)
+                            $data->remote = preg_replace("/$keyval/",'|'.$keyname.'|',$data->remote);
 
                         $break = $idx == 0 ? "" : "\n";
 
