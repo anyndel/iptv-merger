@@ -1,4 +1,12 @@
 <?php
+
+$users = [
+    0 => "ilyaflor@gmail.com",
+    1 => "ilya.florenskiy@gmail.com",
+    2 => "seyambra69@gmail.com",
+    3 => "ambra.frugotti@gmail.com"
+];
+
 class IPTVSource{
 
     public function __construct($name, $url, $prefix)
@@ -29,8 +37,6 @@ function getLocalPath($idx){
     return './local/list'.$idx.'.m3u';
 }
 
-$apikey="aggiornamiLeListe!";
-
 session_start();
 
 $lists = [
@@ -45,9 +51,24 @@ if ( isset($_POST['stage']))
     $stage = $_POST['stage'];
 }
 
-if ( isset($_POST['pw']))
+if ( isset($_POST['idtoken'] ))
 {
-    $_SESSION["APIKEY"] = $_POST['pw'];
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, "https://oauth2.googleapis.com/tokeninfo?id_token=".$_POST["idtoken"]);  
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    $result = curl_exec($ch);
+    
+    $err = curl_error($ch);
+
+    $json = json_decode($result);
+
+    
+    if ( isset($json->email) && in_array($json->email,$users))    
+        $_SESSION["APIKEY"] = $json->email;
+
+    curl_close($ch);
+    
+    header('Location: http://www.cuddlycatlady.com/aside/iptv/index.php');
 }
 
 ?>
@@ -58,14 +79,37 @@ if ( isset($_POST['pw']))
         </title>
     </head>
     <body>
-        <?php if (!isset($_SESSION["APIKEY"]) || $_SESSION["APIKEY"] != $apikey){ ?>
-            <form action="./index.php" method="post">
-                <input type="password" name="pw" />
-                <input type="submit" name="auth" value="andiamo"/>
-            </form>            
+        <?php if (!isset($_SESSION["APIKEY"]) || in_array($_SESSION["APIKEY"],$users) === FALSE){ ?>            
+
+            <script src="https://apis.google.com/js/platform.js" async defer></script>
+            <meta name="google-signin-client_id" content="608891321747-4ed10f12a76ov1b3mknf104gukj2ebrr.apps.googleusercontent.com"> 
+            <div class="g-signin2" data-onsuccess="onSignIn"></div>
+            <script>
+                async function onSignIn(googleUser) {
+                            
+                            var id_token = googleUser.getAuthResponse().id_token;
+                            console.log("signed in");
+                            var formData = new FormData();
+                            formData.append('idtoken',id_token);
+                            var result = await fetch('http://www.cuddlycatlady.com/aside/iptv/index.php',
+                                {
+                                    method: "POST",
+                                    body: formData
+                                }
+                            );                             
+
+                            if ( result.ok ){
+                                
+                                window.location.reload(true);
+                            }
+                        }
+            </script>        
         <?php 
+        
+       
+      
         return;
-        } 
+        }
         ?>
 
         <?php if ($stage == 0){ ?>
@@ -251,6 +295,8 @@ if ( isset($_POST['pw']))
 
                         foreach($keys as $keyname=>$keyval)
                             $data->remote = preg_replace("/$keyval/",'|'.$keyname.'|',$data->remote);
+
+                        $data->remote = preg_replace('/^http/m','http://cuddlycatlady.com/aside/iptv/get.php?r=http', $data->remote);
 
                         $break = $idx == 0 ? "" : "\n";
 
